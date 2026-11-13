@@ -67,6 +67,9 @@ class Settings(BaseSettings):
         default=None,
         alias="cookie_secure",
     )
+    # Session cookie SameSite attribute: "lax", "strict", or "none" (default: "lax").
+    # Use "none" for cross-origin split deployments (e.g. Vercel frontend + cloud backend).
+    cookie_samesite: str = "lax"
 
     # ── Gemini (Phase 5) ──────────────────────────────────────────────────────
     gemini_api_key: str = ""
@@ -90,6 +93,19 @@ class Settings(BaseSettings):
         populate_by_name=True,
     )
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalize_database_url(cls, value: Any) -> Any:
+        """Ensure PostgreSQL connection strings use the asyncpg dialect."""
+        if isinstance(value, str):
+            val = value.strip()
+            if val.startswith("postgres://"):
+                return "postgresql+asyncpg://" + val[len("postgres://"):]
+            if val.startswith("postgresql://") and not val.startswith("postgresql+"):
+                return "postgresql+asyncpg://" + val[len("postgresql://"):]
+            return val
+        return value
+
     @field_validator("database_echo", mode="before")
     @classmethod
     def _empty_database_echo_to_false(cls, value: Any) -> Any:
@@ -105,6 +121,19 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator("cookie_samesite", mode="before")
+    @classmethod
+    def _validate_cookie_samesite(cls, value: Any) -> str:
+        """Validate COOKIE_SAMESITE against RFC 6265bis allowed values."""
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return "lax"
+        s = str(value).strip().lower()
+        if s not in {"lax", "strict", "none"}:
+            raise ValueError(
+                f"Invalid COOKIE_SAMESITE '{value}'. Allowed values are 'lax', 'strict', or 'none'."
+            )
+        return s
 
     @field_validator("trusted_proxy_ips")
     @classmethod
@@ -123,6 +152,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 "COOKIE_SECURE cannot be set to false in production. "
                 "Production must always enforce Secure=True on session cookies."
+            )
+        if self.cookie_samesite == "none" and not self.cookie_secure:
+            raise ValueError(
+                "COOKIE_SAMESITE cannot be 'none' when cookie_secure is False. "
+                "Modern browsers strictly reject SameSite=None cookies unless Secure=True (HTTPS)."
             )
         if self.is_production and self.database_echo:
             self.database_echo = False

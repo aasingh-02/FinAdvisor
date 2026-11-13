@@ -108,10 +108,12 @@ def create_app() -> FastAPI:
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     # Allow only the React dev server (and production frontend URL).
+    # Supports comma-separated frontend URLs (e.g. production domain + preview domain).
     # `allow_credentials=True` is required for cookies to be sent cross-origin.
+    cors_origins = [o.strip() for o in settings.frontend_url.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_url],
+        allow_origins=cors_origins,
         allow_credentials=True,  # Required for HTTP-only cookie auth
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Accept", "Authorization"],

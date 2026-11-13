@@ -49,10 +49,11 @@ def _session_cookie_attributes() -> dict[str, object]:
     Using one source ensures set_cookie and delete_cookie always emit identical
     Secure, HttpOnly, SameSite, and Path attributes.
     """
+    active_settings = get_settings()
     return {
-        "httponly": COOKIE_HTTPONLY,               # JS cannot read this cookie
-        "secure": get_settings().cookie_secure,    # True in prod or when COOKIE_SECURE=true
-        "samesite": COOKIE_SAMESITE,               # Mitigates CSRF
+        "httponly": COOKIE_HTTPONLY,                    # JS cannot read this cookie
+        "secure": active_settings.cookie_secure,        # True in prod or when COOKIE_SECURE=true
+        "samesite": active_settings.cookie_samesite,    # "lax", "strict", or "none" (for cross-origin)
         "path": COOKIE_PATH,
     }
 

@@ -57,6 +57,20 @@ class TestConfigurationSettings:
         """session_secret_key must not be in Settings model_fields."""
         assert "session_secret_key" not in Settings.model_fields
 
+    def test_database_url_normalization(self):
+        """Standard postgres:// and postgresql:// URIs are normalized to postgresql+asyncpg://."""
+        s1 = Settings(database_url="postgres://user:pass@host:5432/db", _env_file=None)
+        assert s1.database_url == "postgresql+asyncpg://user:pass@host:5432/db"
+
+        s2 = Settings(database_url="postgresql://user:pass@host:5432/db", _env_file=None)
+        assert s2.database_url == "postgresql+asyncpg://user:pass@host:5432/db"
+
+        s3 = Settings(database_url="postgresql+asyncpg://user:pass@host:5432/db", _env_file=None)
+        assert s3.database_url == "postgresql+asyncpg://user:pass@host:5432/db"
+
+        s4 = Settings(database_url="sqlite+aiosqlite:///:memory:", _env_file=None)
+        assert s4.database_url == "sqlite+aiosqlite:///:memory:"
+
 
 class TestAppStartupAndAuthWithoutSecretKey:
     """Verify application startup, login, logout, and session lifecycle work without session_secret_key."""

@@ -424,3 +424,30 @@ class TestConfigurableCookieSecure:
 
         assert "Max-Age=0" in clear_header
         assert f'{COOKIE_NAME}=""' in clear_header
+
+    def test_samesite_none_for_cross_origin_deployments(self, monkeypatch):
+        """COOKIE_SAMESITE=none enables cross-origin session cookies when HTTPS is active."""
+        settings = get_settings()
+        monkeypatch.setattr(settings, "environment", "production")
+        monkeypatch.setattr(settings, "cookie_samesite", "none")
+
+        attrs = _session_cookie_attributes()
+        assert attrs["samesite"] == "none"
+        assert attrs["secure"] is True
+
+        res = Response()
+        _set_session_cookie(res, "cross_origin_token")
+        header = res.headers.get("set-cookie", "")
+        assert "SameSite=none" in header
+        assert "Secure" in header
+        assert "HttpOnly" in header
+
+    def test_samesite_none_rejected_without_secure(self):
+        """SameSite=none strictly requires Secure=True; rejected otherwise."""
+        with pytest.raises(ValueError, match="COOKIE_SAMESITE cannot be 'none' when cookie_secure is False"):
+            Settings(
+                database_url="sqlite+aiosqlite:///:memory:",
+                environment="development",
+                cookie_secure=False,
+                cookie_samesite="none",
+            )
